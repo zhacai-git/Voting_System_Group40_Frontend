@@ -5,17 +5,21 @@
         :selectedKeys="selectedKeys"
         style="height: 100%"
     >
+      <a-menu-item key="manage" @click="navigateTo('manage')">
+        <template #icon><control-outlined /></template>
+        {{store.is_admin ? "All Votes" : "My Votes"}}
+      </a-menu-item>
       <a-menu-item key="create" @click="navigateTo('create')">
         <template #icon><form-outlined /></template>
         Create a Vote
       </a-menu-item>
-      <a-menu-item key="manage" @click="navigateTo('manage')">
-        <template #icon><control-outlined /></template>
-        Manage Votes
-      </a-menu-item>
-      <a-menu-item key="profile" @click="navigateTo('profile')">
+      <a-menu-item key="profile" @click="navigateTo('profile')" v-if="!store.is_admin">
         <template #icon><user-outlined /></template>
         Profile
+      </a-menu-item>
+      <a-menu-item key="logout" @click="handleLogout">
+        <template #icon><LogoutOutlined /></template>
+        Logout
       </a-menu-item>
     </a-menu>
   </div>
@@ -23,9 +27,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { FormOutlined, ControlOutlined, UserOutlined } from '@ant-design/icons-vue';
+import { FormOutlined, ControlOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons-vue';
 import { useRouter, useRoute } from 'vue-router';
-
+import {useAuthStore} from "@/stores/authentication.js";
+import {message} from "ant-design-vue";
+const store = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
@@ -58,6 +64,12 @@ const navigateTo = (routeName) => {
   activeItem.value = routeName;
   router.push({ name: routeName });
 };
+
+const handleLogout = () => {
+  store.setLogout()
+  message.success("You have successfully logged out.")
+  router.push({name: 'login'})
+}
 
 // Expose active item to parent component
 defineExpose({ activeItem });

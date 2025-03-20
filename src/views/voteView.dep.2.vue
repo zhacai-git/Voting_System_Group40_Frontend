@@ -40,7 +40,7 @@
           </template>
 
           <!-- 投票已结束时的提示 -->
-          <template v-else-if="effectiveVoteStatus === 'ended' || isVoteExpired || (!vote.isUnlimited && timeLeft <= 0)">
+          <template v-else-if="effectiveVoteStatus === 'ended' || isVoteExpired || timeLeft <= 0">
             <a-alert
                 message="This vote has ended"
                 description="Final results are displayed below."
@@ -80,7 +80,7 @@
         </div>
 
         <!-- 投票控件 - 只有在投票未过期且状态为active时才显示 -->
-        <div v-else-if="effectiveVoteStatus === 'active' && !isVoteExpired && (vote.isUnlimited || timeLeft > 0)">
+        <div v-else-if="effectiveVoteStatus === 'active' && !isVoteExpired && timeLeft > 0">
           <template v-if="vote.allowMultipleChoice">
             <a-checkbox-group v-model:value="voteForm.selectedOptions">
               <div class="vote-option" v-for="(option, index) in vote.options" :key="index">
@@ -112,7 +112,7 @@
         </div>
 
         <!-- 投票结束提示 - 使用effectiveVoteStatus -->
-        <div class="vote-ended-message" v-if="effectiveVoteStatus === 'ended' || isVoteExpired || (!vote.isUnlimited && timeLeft <= 0)">
+        <div class="vote-ended-message" v-if="effectiveVoteStatus === 'ended' || isVoteExpired || timeLeft <= 0">
           <a-alert type="info" message="This vote has ended." banner />
         </div>
       </a-card>
@@ -195,7 +195,7 @@ const vote = ref({
   isPublic: true,
   timeLimit: 0,
   isUnlimited: false,
-  chart_type: 'barChart',
+  voteStyle: 'barChart',
   allowMultipleChoice: false,
   options: [],
   status: 'active',
@@ -225,16 +225,14 @@ const pollingInterval = ref(null);
 const countdownInterval = ref(null);
 const timeLeft = ref(0); // in seconds
 
-// 修改: 检查投票是否已过期（确保正确处理无限期投票）
+// 新增：检查投票是否已过期
 const isVoteExpired = computed(() => {
-  // 无结束时间的投票永不过期
-  if (!vote.value.endTime || vote.value.isUnlimited) return false;
-
+  if (!vote.value.endTime) return false;
   const currentTime = new Date();
   return currentTime >= vote.value.endTime;
 });
 
-// 计算投票的真实状态（考虑时间因素）
+// 新增：计算投票的真实状态（考虑时间因素）
 const effectiveVoteStatus = computed(() => {
   if (isVoteExpired.value) return 'ended';
   return vote.value.status;
@@ -308,13 +306,13 @@ const calculateTimeLimit = (cutOff) => {
   return Math.max(0, Math.floor((end - now) / (1000 * 60)));
 };
 
-// 从options中提取content字段
+// 修改：从options中提取content字段
 const extractOptions = (options) => {
   if (!options || !Array.isArray(options)) return [];
   return options.map(option => option.content || '');
 };
 
-// 映射optionsWithVotes使用content和count字段
+// 修改：映射optionsWithVotes使用content和count字段
 const mapOptionsWithVotes = (options) => {
   if (!options || !Array.isArray(options)) return [];
   return options.map(option => ({
@@ -324,7 +322,7 @@ const mapOptionsWithVotes = (options) => {
   }));
 };
 
-// 计算总票数使用count字段
+// 修改：计算总票数使用count字段
 const calculateTotalVotes = (options) => {
   if (!options || !Array.isArray(options)) return 0;
   return options.reduce((sum, option) => sum + (option.count || 0), 0);
@@ -604,9 +602,9 @@ const updateChart = () => {
   }
 
   let options;
-  const chart_type = vote.value.chart_type || 'barChart'; // Default to barChart
+  const chartStyle = vote.value.voteStyle || 'barChart'; // Default to barChart
 
-  if (chart_type === 'pieChart') {
+  if (chartStyle === 'pieChart') {
     // Pie chart configuration
     options = {
       tooltip: {
@@ -701,15 +699,13 @@ const updateChart = () => {
   }
 };
 
-// 修改：确保无限期投票不会被更新为已结束
+// 修改：增加对结束时间的检查
 const updateTimeLeft = () => {
-  // 如果是无限期投票或已结束状态，不更新倒计时
-  if (vote.value.isUnlimited || effectiveVoteStatus.value !== 'active') return;
+  if (vote.value.isUnlimited || effectiveVoteStatus !== 'active') return;
 
   timeLeft.value -= 1;
 
-  // 只有非无限期投票且剩余时间为0时，才将状态改为结束
-  if (!vote.value.isUnlimited && timeLeft.value <= 0) {
+  if (timeLeft.value <= 0) {
     // 即使后端状态是active，也强制将本地状态改为ended
     vote.value.status = 'ended';
     stopPolling();
@@ -739,7 +735,7 @@ const correctTimeFromServer = (serverEndTime) => {
   }
 };
 
-// 修改：改进状态判断逻辑，确保正确处理无限期投票
+// 修改：增加判断投票是否已过期的逻辑
 const fetchVoteData = async () => {
   try {
     fetchError.value = false;
@@ -764,19 +760,16 @@ const fetchVoteData = async () => {
     const apiData = response.data;
     console.log('API Data:', apiData);
 
-    // 检查投票是否已经结束（仅当有截止时间时）
+    // 检查投票是否已经结束（根据cut_off时间）
     let isExpired = false;
     if (apiData.cut_off) {
       const cutOffTime = new Date(apiData.cut_off);
       const currentTime = new Date();
       isExpired = currentTime >= cutOffTime;
-    } else {
-      // 如果没有截止时间，则取决于active状态
-      isExpired = !apiData.active;
     }
 
-    // 修正后端bug：如果有截止时间且已过期，即使active为true也视为已结束
-    const voteStatus = (apiData.cut_off && isExpired) ? 'ended' : (apiData.active ? 'active' : 'ended');
+    // 修正后端bug：如果投票已经超过截止时间，即使active为true也视为已结束
+    const voteStatus = isExpired ? 'ended' : (apiData.active ? 'active' : 'ended');
 
     // Map API response to component expected structure
     vote.value = {
@@ -785,8 +778,8 @@ const fetchVoteData = async () => {
       voteName: apiData.title,
       isPublic: true, // Default value if not provided
       timeLimit: calculateTimeLimit(apiData.cut_off),
-      isUnlimited: !apiData.cut_off, // 无截止时间表示无限期
-      chart_type: apiData.chart_type || 'barChart', // Default to barChart if not present
+      isUnlimited: !apiData.cut_off,
+      voteStyle: apiData.voteStyle || 'barChart', // Default to barChart if not present
       allowMultipleChoice: apiData.allow_multiple_choice || false, // Default value
       options: extractOptions(apiData.options),
       status: voteStatus, // 使用修正后的状态
@@ -797,9 +790,11 @@ const fetchVoteData = async () => {
     };
 
     console.log('Mapped vote data:', vote.value);
-    console.log('Status:', vote.value.status, 'IsExpired:', isExpired, 'IsUnlimited:', vote.value.isUnlimited);
+    console.log('Status:', vote.value.status, 'IsExpired:', isExpired);
+    console.log('Options:', vote.value.options);
+    console.log('Options with votes:', vote.value.optionsWithVotes);
 
-    // 只有当有结束时间时才更新剩余时间
+    // Update time left if vote has end time
     if (vote.value.endTime) {
       const now = new Date();
       const end = new Date(vote.value.endTime);
@@ -810,13 +805,10 @@ const fetchVoteData = async () => {
         timeLeft.value = 0;
       }
 
-      // 只有在活跃、有截止时间且未过期时才启动倒计时
+      // Start countdown if active and not expired
       if (vote.value.status === 'active' && !vote.value.isUnlimited && !isExpired) {
         startCountdown();
       }
-    } else {
-      // 无限期投票，设置一个很大的时间值或特殊标记
-      timeLeft.value = Number.MAX_SAFE_INTEGER;
     }
 
     // Check if user already voted in this poll
@@ -829,8 +821,8 @@ const fetchVoteData = async () => {
       });
     }
 
-    // 只有在真正处于活跃状态时才启动轮询
-    if (vote.value.status === 'active') {
+    // Only start polling if vote is truly active
+    if (vote.value.status === 'active' && !isExpired) {
       startPolling();
     }
 
@@ -855,7 +847,7 @@ const retryFetch = async () => {
   await fetchVoteData();
 
   // If successful and vote is active, restart polling
-  if (!fetchError.value && effectiveVoteStatus.value === 'active') {
+  if (!fetchError.value && effectiveVoteStatus === 'active') {
     startPolling();
   }
 };
@@ -887,8 +879,9 @@ const submitVote = async () => {
 
     console.log(selectedOptions);
     try {
+      console.log(1)
       console.log(vote.value);
-      const vote_result = await make_vote(vote.value.id, vote.value.optionsWithVotes[selectedOptions[0]].id);
+      const vote_result = await make_vote(store.vote_code, vote.value.optionsWithVotes[selectedOptions[0]].option_id);
       console.log(vote_result);
       await recordUserVote(selectedOptions);
       message.success('Your vote has been submitted!');
@@ -943,13 +936,10 @@ const stopPolling = () => {
   }
 };
 
-// 修改：确保无限期投票不启动倒计时
+// 修改：考虑投票是否已过期
 const startCountdown = () => {
-  // 清除任何现有的倒计时
+  // Clear any existing countdown first
   stopCountdown();
-
-  // 无限期投票不需要倒计时
-  if (vote.value.isUnlimited) return;
 
   // 如果投票已经结束或过期，不启动倒计时
   if (isVoteExpired.value || vote.value.status === 'ended') {
@@ -957,12 +947,12 @@ const startCountdown = () => {
     return;
   }
 
-  // 计算初始剩余时间
+  // Calculate initial time left
   const now = new Date();
   const end = new Date(vote.value.endTime);
   timeLeft.value = Math.max(0, Math.floor((end - now) / 1000));
 
-  // 设置倒计时间隔（每秒）
+  // Set up countdown interval (every second)
   countdownInterval.value = setInterval(() => {
     updateTimeLeft();
   }, 1000);
@@ -984,7 +974,7 @@ watch(() => vote.value.status, (newStatus) => {
   }
 });
 
-// 监听有效状态变化
+// 新增：监听有效状态变化
 watch(effectiveVoteStatus, (newStatus, oldStatus) => {
   if (newStatus === 'ended' && oldStatus === 'active') {
     // 当状态从active变为ended时，自动刷新图表
@@ -999,7 +989,7 @@ watch(effectiveVoteStatus, (newStatus, oldStatus) => {
 });
 
 // Watch for chart style changes to update the chart
-watch(() => vote.value.chart_type, () => {
+watch(() => vote.value.voteStyle, () => {
   if (chart.value) {
     updateChart();
   }
@@ -1040,7 +1030,7 @@ onMounted(async () => {
   initChart();
 
   // Start polling and countdown if vote is active and not expired
-  if (effectiveVoteStatus.value === 'active' && !isVoteExpired.value) {
+  if (effectiveVoteStatus === 'active' && !isVoteExpired.value) {
     startPolling();
     if (!vote.value.isUnlimited) {
       startCountdown();

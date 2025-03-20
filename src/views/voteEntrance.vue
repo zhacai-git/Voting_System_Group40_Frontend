@@ -85,7 +85,7 @@ const joinVote = () => {
   if (isValidVoteNumber.value) {
     console.log(`加入投票: ${actualVoteNumber.value}`);
     // 这里可以添加其他实现逻辑
-    store.setCode(isValidVoteNumber.value);
+    store.setCode(actualVoteNumber.value);
     router.push({name: 'vote'})
   }
 };

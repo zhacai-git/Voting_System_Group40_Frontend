@@ -162,7 +162,7 @@ const handle_login = () => {
     if (!res.data.error) {
       store.setLogin(res.data);
       message.success("Welcome, " + store.username);
-      router.push({name: 'create'});
+      router.push({name: 'manage'});
     } else {
       message.error("The email or password is incorrect, please try again");
     }
@@ -191,7 +191,7 @@ const handle_register = () => {
           res.data.name = res.data.user.name;
           store.setLogin(res.data);
           message.success("Register success, redirecting..");
-          router.push({name: 'create'});
+          router.push({name: 'manage'});
         }
       }).catch(err => {
         console.log(err);

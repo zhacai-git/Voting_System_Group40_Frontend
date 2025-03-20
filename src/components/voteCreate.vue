@@ -233,7 +233,7 @@ const createVote = () => {
     isPublic: formState.isPublic,
     is_unlimited: formState.isUnlimited,
     cut_off: formState.isUnlimited ? null : formatDateForPostgres(formState.endTime),
-    style: formState.voteStyle,
+    chart_type: formState.voteStyle,
     options: formState.options.filter(opt => opt.trim() !== '')
   };
 

@@ -22,9 +22,32 @@ const useUserAuth = () => {
       }
     })
   }
+  const get_profile = () => {
+    return request({
+      url: '/profile/',
+      method: 'get'
+    })
+  }
+  const update_profile = (data) => {
+    return request({
+      url: '/profile/',
+      method: 'put',
+      data
+    })
+  }
+  const admin_login = (data) => {
+    return request({
+      url: '/admin/login/',
+      method: 'post',
+      data
+    })
+  }
   return {
     login,
-    register
+    register,
+    get_profile,
+    update_profile,
+    admin_login
   }
 }
 

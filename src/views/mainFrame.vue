@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="header">
       <h2 class="system-title">Online Voting System</h2>
-      <span class="version-info">ITECH Group 40 Sys. Ver: 0.1.1.250318</span>
+      <span class="version-info">ITECH Group 40 Sys. Ver: 1.0.1.250320</span>
     </div>
 
     <div class="content-area">

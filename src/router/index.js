@@ -23,6 +23,11 @@ const router = createRouter({
           component: () => import('../views/authentication.vue')
         },
         {
+          path: '/adminLogin',
+          name: 'adminLogin',
+          component: () => import('../views/adminAuth.vue')
+        },
+        {
           path: '/dashboard',
           name: 'dashboard',
           component: () => import('../views/userDashboard.vue'),
@@ -36,6 +41,11 @@ const router = createRouter({
               path: '/manage',
               name: 'manage',
               component: () => import('../components/manageVote.vue')
+            },
+            {
+              path: '/profile',
+              name: 'profile',
+              component: () => import('../components/userProfile.vue')
             }
           ]
         },
